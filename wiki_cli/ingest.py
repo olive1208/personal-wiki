@@ -1,0 +1,190 @@
+"""Ingest: turn the original notes in vault/raw into linked wiki pages.
+
+For each page in wiki_plan.json, the harness:
+1. reads the original source notes (never changes them),
+2. sends their text plus the wiki writing rules to local Gemma,
+3. saves the page under vault/wiki/<folder>/<title>.md with properties,
+   links to related pages, and links back to the original sources,
+4. rebuilds vault/index.md and the search index.
+
+Page names come from wiki_plan.json, never from the model, so names stay
+short and readable. A page is only rewritten when its sources changed
+(or with --force), so ingesting again never creates duplicates.
+"""
+import hashlib
+import json
+import re
+from datetime import datetime
+from pathlib import Path
+
+from wiki_cli import llm, retrieval
+from wiki_cli.config import INDEX_MD, MODEL, PROMPTS_DIR, RAW_DIR, VAULT_DIR, WIKI_DIR, WIKI_PLAN
+
+
+def load_plan():
+    plan = json.loads(WIKI_PLAN.read_text(encoding="utf-8"))
+    titles = {p["title"] for p in plan["pages"]}
+    # Any raw note not covered by the plan still gets its own page, named after the file
+    covered = {s for p in plan["pages"] for s in p["sources"]}
+    for path in sorted(RAW_DIR.iterdir()):
+        if path.suffix in (".md", ".txt") and path.name not in covered:
+            title = path.stem.strip().title()
+            if title not in titles:
+                plan["pages"].append({
+                    "title": title, "folder": "Sessions", "description": f"Notes from {path.name}",
+                    "sources": [path.name], "related": {},
+                })
+    return plan
+
+
+def source_hash(names):
+    """A short fingerprint of the source texts, used to tell if a page is out of date."""
+    digest = hashlib.sha256()
+    for name in names:
+        digest.update((RAW_DIR / name).read_bytes())
+    return digest.hexdigest()[:12]
+
+
+def read_properties(path):
+    """Read the simple 'key: value' properties at the top of an existing page."""
+    if not path.exists():
+        return {}
+    text = path.read_text(encoding="utf-8")
+    match = re.match(r"---\n(.*?)\n---", text, re.DOTALL)
+    if not match:
+        return {}
+    props = {}
+    for line in match.group(1).splitlines():
+        if ":" in line and not line.startswith(" "):
+            key, value = line.split(":", 1)
+            props[key.strip()] = value.strip()
+    return props
+
+
+def clean_body(text):
+    """Remove things the model sometimes adds that the harness writes itself."""
+    text = re.sub(r"^```(?:markdown)?\s*|\s*```$", "", text.strip())
+    lines = text.splitlines()
+    while lines and (lines[0].startswith("# ") or not lines[0].strip()):
+        lines.pop(0)  # a title line: the harness writes the heading
+    body = "\n".join(lines)
+    # Cut any Related notes or Sources section the model wrote anyway
+    body = re.split(r"\n#{1,3} (Related|Sources?)\b", body)[0]
+    return body.strip()
+
+
+def generate_body(page):
+    """Ask Gemma to write the Summary and Key details from the source notes."""
+    rules = (PROMPTS_DIR / "ingest-instructions.md").read_text(encoding="utf-8")
+    parts = []
+    for name in page["sources"]:
+        text = (RAW_DIR / name).read_text(encoding="utf-8-sig").strip()
+        parts.append(f"=== Source: {Path(name).stem} ===\n{text}")
+    prompt = (
+        f"Page title: {page['title']}\n"
+        f"This page should cover: {page['description']}\n\n"
+        + "\n\n".join(parts)
+    )
+    messages = [{"role": "system", "content": rules}, {"role": "user", "content": prompt}]
+    reply, seconds = llm.chat(messages, temperature=0.2, num_ctx=8192)
+    return clean_body(reply), seconds
+
+
+def render_page(page, body, fingerprint):
+    """Build the full Markdown file: properties, heading, body, links, sources."""
+    lines = [
+        "---",
+        f"title: {page['title']}",
+        f"folder: {page['folder']}",
+        f"description: {page['description']}",
+        "sources:",
+    ]
+    lines += [f"  - raw/{name}" for name in page["sources"]]
+    lines += [
+        f"source_hash: {fingerprint}",
+        f"generated_by: {MODEL}",
+        f"generated_at: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        "reviewed: false",
+        "---",
+        "",
+        f"# {page['title']}",
+        "",
+        body,
+        "",
+        "## Related notes",
+        "",
+    ]
+    for title, reason in page["related"].items():
+        lines.append(f"- [[{title}]]: {reason}")
+    if not page["related"]:
+        lines.append("- (none yet)")
+    lines += ["", "## Sources", ""]
+    for name in page["sources"]:
+        lines.append(f"- [[raw/{Path(name).stem}|{Path(name).stem} (original note)]]")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def write_index(plan):
+    """Write vault/index.md: a landing page grouped by topic folder."""
+    lines = [
+        "# Tech Recruiting Wiki",
+        "",
+        "My notes from MBA tech recruiting events, organized for browsing in Obsidian.",
+        "Pages in wiki/ are generated by local Gemma from the original notes in raw/, then reviewed by me.",
+        "",
+    ]
+    for folder, about in plan["folders"].items():
+        lines += [f"## {folder}", "", about, ""]
+        for page in plan["pages"]:
+            if page["folder"] == folder:
+                lines.append(f"- [[{page['title']}]]: {page['description']}")
+        lines.append("")
+    lines += ["## Original notes", "", "Unchanged source notes. Every wiki page links back to these.", ""]
+    for path in sorted(RAW_DIR.iterdir()):
+        if path.suffix in (".md", ".txt"):
+            lines.append(f"- [[raw/{path.stem}|{path.stem}]]")
+    lines.append("")
+    INDEX_MD.write_text("\n".join(lines), encoding="utf-8")
+
+
+def ingest(target=None, force=False, report=print):
+    """Ingest every page, or only pages that use the given source file."""
+    if target is not None:
+        target = Path(target)
+        if not target.exists():
+            raise FileNotFoundError(f"Not found: {target}")
+    plan = load_plan()
+    only = None
+    if target is not None and target.is_file():
+        only = target.name
+        if not (RAW_DIR / only).exists():
+            raise FileNotFoundError(f"{only} must be inside {RAW_DIR} before it can be ingested.")
+
+    summary = {"written": [], "skipped": [], "seconds": 0.0}
+    for page in plan["pages"]:
+        if only and only not in page["sources"]:
+            continue
+        path = WIKI_DIR / page["folder"] / f"{page['title']}.md"
+        fingerprint = source_hash(page["sources"])
+        old = read_properties(path)
+        if not force and old.get("source_hash") == fingerprint:
+            report(f"  up to date: {path.relative_to(VAULT_DIR).as_posix()}")
+            summary["skipped"].append(page["title"])
+            continue
+        if not force and old.get("reviewed") == "true":
+            report(f"  sources changed but page is marked reviewed, not overwriting: {page['title']} (use --force)")
+            summary["skipped"].append(page["title"])
+            continue
+        report(f"  writing {path.relative_to(VAULT_DIR).as_posix()} from {', '.join(page['sources'])} ...")
+        body, seconds = generate_body(page)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(render_page(page, body, fingerprint), encoding="utf-8")
+        report(f"    done in {seconds:.1f} s")
+        summary["written"].append(page["title"])
+        summary["seconds"] += seconds
+
+    write_index(plan)
+    passages = retrieval.build_index()
+    report(f"  updated vault/index.md and the search index ({len(passages)} passages)")
+    return summary

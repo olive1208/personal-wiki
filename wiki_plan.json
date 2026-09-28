@@ -1,0 +1,82 @@
+{
+  "_about": "Which wiki pages to build, from which original sources, and how they link. The harness uses this file so page names stay short and stable, and re-ingesting updates the same pages instead of creating duplicates.",
+  "folders": {
+    "Sessions": "One page per recruiting event I attended",
+    "Topics": "Pages that combine what several sessions said about one subject"
+  },
+  "pages": [
+    {
+      "title": "Amazon MBA Info Session",
+      "folder": "Sessions",
+      "description": "Amazon's MBA programs (ALA, FLDP, MLDP and others), interview style, and application process",
+      "sources": ["Amazon info session.md"],
+      "related": {
+        "Behavioral Interview Prep": "the session explained Amazon's STAR and leadership-principle interview style",
+        "Tech Hiring Process": "Amazon's own application steps, compared with the general tech process"
+      }
+    },
+    {
+      "title": "Tech Internship Panel",
+      "folder": "Sessions",
+      "description": "Second-year MBA students on how they landed tech internships",
+      "sources": ["Tech internship panel.md"],
+      "related": {
+        "Tech Networking": "most panel advice was about networking with recruiters, alumni, and classmates",
+        "Amazon MBA Info Session": "one panelist interned at AWS and described Amazon recruiting"
+      }
+    },
+    {
+      "title": "Tech Roles Workshop",
+      "folder": "Sessions",
+      "description": "Career workshop on MBA roles in tech, what shapes a role, and the hiring process",
+      "sources": ["Tech roles primer.md"],
+      "related": {
+        "Tech Hiring Process": "the workshop listed the usual hiring steps",
+        "Tech Networking": "the workshop gave networking questions to ask",
+        "Tech Resume Workshop": "both sessions stress showing transferable skills"
+      }
+    },
+    {
+      "title": "Tech Resume Workshop",
+      "folder": "Sessions",
+      "description": "How to rewrite resume bullets for tech roles",
+      "sources": ["Rewrite tech resume.md"],
+      "related": {
+        "Behavioral Interview Prep": "a bullet bank doubles as a story bank for interviews",
+        "Tech Roles Workshop": "the role descriptions tell you which skills to surface"
+      }
+    },
+    {
+      "title": "Tech Hiring Process",
+      "folder": "Topics",
+      "description": "The steps from application to offer, in general and at Amazon",
+      "sources": ["Tech roles primer.md", "Amazon info session.md"],
+      "related": {
+        "Tech Roles Workshop": "source of the general hiring steps",
+        "Amazon MBA Info Session": "source of Amazon's specific steps",
+        "Behavioral Interview Prep": "how to prepare for the interview step"
+      }
+    },
+    {
+      "title": "Tech Networking",
+      "folder": "Topics",
+      "description": "Networking advice for tech recruiting from the panel and the roles workshop",
+      "sources": ["Tech internship panel.md", "Tech roles primer.md"],
+      "related": {
+        "Tech Internship Panel": "panelists' own networking stories",
+        "Tech Roles Workshop": "what to ask the people you meet"
+      }
+    },
+    {
+      "title": "Behavioral Interview Prep",
+      "folder": "Topics",
+      "description": "Preparing stories for behavioral interviews, using the STAR method and resume bullets",
+      "sources": ["Amazon info session.md", "Rewrite tech resume.md"],
+      "related": {
+        "Amazon MBA Info Session": "source of the STAR method and leadership-principle advice",
+        "Tech Resume Workshop": "source of the bullet bank idea",
+        "Tech Hiring Process": "where the interview fits in the process"
+      }
+    }
+  ]
+}

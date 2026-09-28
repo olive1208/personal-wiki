@@ -1,0 +1,68 @@
+﻿**********************
+Windows PowerShell transcript start
+Start time: 20260928152221
+Username: ADMIN\Olive
+RunAs User: ADMIN\Olive
+Configuration Name: 
+Machine: ADMIN (Microsoft Windows NT 10.0.26200.0)
+Host Application: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+Process ID: 29384
+PSVersion: 5.1.26100.9444
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.9444
+BuildVersion: 10.0.26100.9444
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+Transcript started, output file is evidence\offline-run.txt
+PS D:\personal-wiki>
+(.venv) ping ollama.com -n 1
+Ping request could not find host ollama.com. Please check the name and try again.
+PS D:\personal-wiki>
+(.venv) ollama list
+NAME          ID              SIZE      MODIFIED
+gemma4:e2b    7fbdbf8f5e45    7.2 GB    2 days ago
+PS D:\personal-wiki>
+(.venv) python -m wiki_cli --help
+positional arguments:
+  {ingest,search,ask,chat}
+    ingest              build or update wiki pages from notes in vault/raw
+    search              show original passages that match a query (no model used)
+    ask                 factual answer from your notes, with citations
+    chat                talk with Scout, your assistant (keeps the conversation)
+
+options:
+  -h, --help            show this help message and exit
+
+Model: gemma4:e2b through Ollama at http://localhost:11434 (local, default). Settings are in
+wiki_cli/config.py; page names and links in wiki_plan.json; model instructions in prompts/.
+Run 'python -m wiki_cli <command> --help' for details.
+PS D:\personal-wiki>
+(.venv) python -m wiki_cli ingest "vault/raw/Rewrite tech resume.md" --force
+
+PS D:\personal-wiki>
+(.venv) python -m wiki_cli search "Amazon interview STAR method"
+
+PS D:\personal-wiki>
+(.venv) python -m wiki_cli ask "When and how are the Amazon ALA internship interviews held?"
+
+PS D:\personal-wiki>
+(.venv) python -m wiki_cli ask "Which Amazon MBA program lets me see different sides of the retail business?"
+
+PS D:\personal-wiki>
+(.venv) python -m wiki_cli ask "What are the steps in the hiring process for tech MBA roles, and how does Amazon's process compare?"
+
+PS D:\personal-wiki>
+(.venv) python -m wiki_cli ask "What is the base salary for Amazon's FLDP role?"
+
+PS D:\personal-wiki>
+(.venv) python -m wiki_cli chat
+
+PS D:\personal-wiki>
+(.venv) Stop-Transcript
+**********************
+Windows PowerShell transcript end
+End time: 20260928152822
+**********************

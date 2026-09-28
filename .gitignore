@@ -1,0 +1,6 @@
+﻿.venv/
+__pycache__/
+data/
+readme-evidence.zip
+evidence/wiki-reviewed-backup/
+vault/.obsidian/workspace*.json
